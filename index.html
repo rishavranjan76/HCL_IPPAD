@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPPAD Turbomachinery Cell #4 | Industrial Anomaly Detection SCADA</title>
+  
+  <!-- Modern Industrial Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Dashboard Styling -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Chart.js (Local offline copy with CDN fallback) -->
+  <script src="js/chart.umd.js"></script>
+  <script>
+    if (typeof Chart === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>');
+    }
+  </script>
+</head>
+<body>
+
+  <div class="dashboard-container">
+
+    <!-- ====================================================================
+         HEADER
+         ==================================================================== -->
+    <header class="main-header">
+      <div class="brand-section">
+        <div class="brand-icon-wrapper">
+          <!-- Industrial Turbomachinery / Motor Turbine Icon -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </div>
+        <div class="brand-titles">
+          <h1>
+            IPPAD Turbomachinery Cell #4
+            <span class="title-badge">ESP32 • ABAD ENGINE</span>
+          </h1>
+          <p>
+            <span>Industrial Process Parameter Anomaly Detection</span>
+            <span style="opacity: 0.4">•</span>
+            <span style="color: var(--c-vib); font-family: var(--font-mono); font-size: 0.76rem;">Adaptive Baseline Anomaly Detector (2 Hz Stream)</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- 2 Operating Modes (Demo Simulation vs Real-Time Hardware Data) -->
+      <div class="mode-switch-container">
+        <span class="mode-switch-label">Data Feed Mode:</span>
+        <div class="mode-switch-group">
+          <button class="mode-btn active" id="btnModeDemo" title="Run interactive simulation engine with physical fault tests">
+            <span>🎮 Demo Simulation</span>
+          </button>
+          <button class="mode-btn real" id="btnModeReal" title="Connect to live ESP32 microcontroller or localhost REST API">
+            <span>⚡ Real-Time Hardware</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Dual Status Indicators (Localhost Server & ESP32 Hardware Link) -->
+      <div class="header-status-strip">
+        <!-- 1. Localhost Server Status -->
+        <div class="status-pill-box" title="Local Python Server (http://localhost:8000)">
+          <div class="status-indicator-dot offline" id="dotServer"></div>
+          <div>
+            <div class="status-label">Localhost Server</div>
+            <div class="status-val offline" id="txtServerStatus">Checking...</div>
+          </div>
+        </div>
+
+        <!-- 2. ESP32 Hardware Status -->
+        <div class="status-pill-box" title="ESP32 Microcontroller Link">
+          <div class="status-indicator-dot standby" id="dotEsp32"></div>
+          <div>
+            <div class="status-label">ESP32 Hardware</div>
+            <div class="status-val standby" id="txtEsp32Status">SIMULATED</div>
+          </div>
+        </div>
+
+        <!-- 3. Telemetry Rate -->
+        <div class="status-pill-box" title="Telemetry Rate">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c-vib)" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <div>
+            <div class="status-label">Telemetry Rate</div>
+            <div class="status-val" id="txtLastUpdate">2.0 Hz (500ms)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Header Actions -->
+      <div class="header-actions">
+        <!-- Re-learn Baseline Button (25s) -->
+        <button class="btn-cyber primary" id="btnLearnBaseline" title="Trigger 25s Welford baseline learning phase (50 samples @ 2 Hz)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+          </svg>
+          Learn Baseline (25s)
+        </button>
+
+        <!-- Calibrate ACS712 Button -->
+        <button class="btn-cyber" id="btnCalAcs" title="Zero-offset calibrate ACS712 current sensor">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="m10 15 5-3-5-3v6z"/>
+          </svg>
+          Calibrate ACS712
+        </button>
+
+        <!-- Settings Modal Button -->
+        <button class="btn-cyber" id="btnOpenSettingsModal" title="Configure ESP32 IP & Protocol">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          Settings
+        </button>
+      </div>
+    </header>
+
+    <!-- ====================================================================
+         PANEL 1: MACHINE STATUS STRIP
+         ==================================================================== -->
+    <section class="machine-status-strip">
+      
+      <!-- Operating State Badge -->
+      <div class="status-stat-block">
+        <span class="stat-header-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>
+          Operating State
+        </span>
+        <div class="machine-state-badge normal" id="badgeMachineState">
+          <span class="status-indicator-dot" style="background: currentColor;"></span>
+          <span id="txtMachineState">NORMAL</span>
+        </div>
+      </div>
+
+      <!-- Anomaly Score Gauge (0-6.0) -->
+      <div class="anomaly-score-widget">
+        <div class="score-display-row">
+          <span class="stat-header-label">Fused Anomaly Score (S)</span>
+          <span class="score-threshold-markers">WATCH ≥ 2.5 • CRIT ≥ 4.0</span>
+        </div>
+        <div style="display: flex; align-items: baseline; gap: 0.6rem;">
+          <span class="score-number" id="valAnomalyScore">0.35</span>
+          <span style="font-size: 0.75rem; color: #94a3b8; font-family: var(--font-mono);">/ 6.00</span>
+        </div>
+        <div class="score-meter-track">
+          <div class="score-meter-fill" id="barAnomalyScore" style="width: 8%;"></div>
+        </div>
+        <div class="score-meter-thresholds">
+          <span>0.0 (Normal)</span>
+          <span style="color: var(--st-watch);">2.5 (Watch)</span>
+          <span style="color: var(--st-critical);">4.0 (Critical)</span>
+          <span>6.0</span>
+        </div>
+      </div>
+
+      <!-- Learning Progress (25s / 50 samples) -->
+      <div class="learning-widget">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="stat-header-label">25s Baseline Learning</span>
+          <span style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 700; color: var(--c-vib);" id="valLearnProgress">100%</span>
+        </div>
+        <div class="learning-meter-track" style="margin-top: 0.4rem;">
+          <div class="learning-meter-fill" id="barLearnProgress" style="width: 100%;"></div>
+        </div>
+        <span id="lblLearnDetail" style="font-size: 0.68rem; color: #64748b; margin-top: 4px;">25s baseline locked • 50 samples @ 2 Hz • Welford Algorithm</span>
+      </div>
+
+      <!-- Top Contributing Channel -->
+      <div class="status-stat-block">
+        <span class="stat-header-label">Top Contributor (w_i·z_i²)</span>
+        <div style="font-family: var(--font-mono); font-size: 0.95rem; font-weight: 700; color: #ffffff;" id="txtTopChannel">
+          Vibration RMS (MPU6050)
+        </div>
+        <span style="font-size: 0.68rem; color: #64748b;">Dominant anomaly driver</span>
+      </div>
+
+      <!-- System Uptime -->
+      <div class="status-stat-block">
+        <span class="stat-header-label">System Uptime</span>
+        <div style="font-family: var(--font-mono); font-size: 1.15rem; font-weight: 700; color: var(--c-volt);" id="valSystemUptime">
+          00:00:00
+        </div>
+        <span style="font-size: 0.68rem; color: #64748b;">ESP32 DevKit V1 Runtime</span>
+      </div>
+
+    </section>
+
+    <!-- ====================================================================
+         PANEL 2: DIGITAL TWIN 2D VISUALIZER & FAULT INJECTION SUITE
+         ==================================================================== -->
+    <div class="twin-and-logic-row">
+
+      <!-- Left: Interactive Turbomachinery Cell #4 Digital Twin 2D Schematic -->
+      <div class="card-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Turbomachinery Cell #4 Digital Twin Visualizer
+          </div>
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--c-vib);">
+            REAL-TIME PHYSICAL SYNCHRONIZATION
+          </span>
+        </div>
+
+        <div class="turbomachine-stage">
+          <!-- Active Fault Alert Badge inside stage -->
+          <div class="twin-fault-banner" id="twinFaultBanner" hidden></div>
+
+          <!-- Dynamic SVG Turbomachine Model -->
+          <div class="twin-assembly">
+            <svg viewBox="0 0 600 180">
+              <defs>
+                <!-- Thermal heat gradient for bearing -->
+                <radialGradient id="heatGlowGrad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#ff0055" stop-opacity="0.9"/>
+                  <stop offset="60%" stop-color="#ff6b3d" stop-opacity="0.4"/>
+                  <stop offset="100%" stop-color="#ff6b3d" stop-opacity="0"/>
+                </radialGradient>
+                <!-- Vibration wave pulse -->
+                <radialGradient id="vibWaveGrad" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.6"/>
+                  <stop offset="100%" stop-color="#00f0ff" stop-opacity="0"/>
+                </radialGradient>
+              </defs>
+
+              <!-- Base Bedplate Rail -->
+              <rect x="20" y="145" width="560" height="18" rx="3" fill="#131e33" stroke="#253858" stroke-width="2"/>
+              <line x1="30" y1="154" x2="570" y2="154" stroke="#334d77" stroke-width="1.5" stroke-dasharray="10, 8"/>
+
+              <!-- 1. ELECTRIC DRIVE MOTOR (Left) -->
+              <g id="twinMotor">
+                <!-- Motor Feet -->
+                <rect x="40" y="130" width="20" height="16" fill="#1e293b" stroke="#334155"/>
+                <rect x="140" y="130" width="20" height="16" fill="#1e293b" stroke="#334155"/>
+                <!-- Motor Stator Casing -->
+                <rect x="35" y="45" width="130" height="88" rx="8" fill="#162238" stroke="#38bdf8" stroke-width="2"/>
+                <!-- Motor Cooling Fins -->
+                <line x1="50" y1="52" x2="50" y2="126" stroke="#223659" stroke-width="3"/>
+                <line x1="70" y1="52" x2="70" y2="126" stroke="#223659" stroke-width="3"/>
+                <line x1="90" y1="52" x2="90" y2="126" stroke="#223659" stroke-width="3"/>
+                <line x1="110" y1="52" x2="110" y2="126" stroke="#223659" stroke-width="3"/>
+                <line x1="130" y1="52" x2="130" y2="126" stroke="#223659" stroke-width="3"/>
+                <line x1="150" y1="52" x2="150" y2="126" stroke="#223659" stroke-width="3"/>
+                <!-- Terminal Box (Current INA219 / ACS712 Point) -->
+                <rect x="75" y="28" width="50" height="18" rx="3" fill="#0f172a" stroke="#ffd60a" stroke-width="1.5"/>
+                <text x="100" y="41" fill="#ffd60a" font-family="'JetBrains Mono'" font-size="8" font-weight="700" text-anchor="middle">I: INA219</text>
+                <!-- Overload Coil Glow Indicator -->
+                <rect id="twinMotorCoilGlow" x="38" y="48" width="124" height="82" rx="6" fill="#ffd60a" opacity="0.08" pointer-events="none"/>
+                <text x="100" y="93" fill="#94a3b8" font-family="'Rajdhani'" font-size="12" font-weight="700" text-anchor="middle" letter-spacing="1">AC DRIVE MOTOR</text>
+              </g>
+
+              <!-- 2. FLEXIBLE COUPLING -->
+              <g id="twinCoupling">
+                <rect x="165" y="78" width="22" height="24" rx="2" fill="#334155" stroke="#475569"/>
+                <line x1="176" y1="78" x2="176" y2="102" stroke="#64748b" stroke-width="2"/>
+              </g>
+
+              <!-- 3. ROTATING SHAFT -->
+              <rect x="187" y="84" width="225" height="12" fill="#94a3b8" stroke="#cbd5e1" stroke-width="1"/>
+
+              <!-- 4. PILLOW-BLOCK BEARING HOUSING (MPU6050 & DHT11 Location) -->
+              <g id="twinBearingBlock" class="bearing-housing">
+                <!-- Bearing Pedestal -->
+                <path d="M 270 145 L 285 80 L 335 80 L 350 145 Z" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+                <!-- Pillow block ring -->
+                <circle cx="310" cy="90" r="28" fill="#131e33" stroke="#64748b" stroke-width="2"/>
+                <circle cx="310" cy="90" r="16" fill="#0b1322" stroke="#94a3b8" stroke-width="1.5"/>
+                
+                <!-- Dynamic Thermal Heat Glow -->
+                <circle id="twinBearingHeatGlow" cx="310" cy="90" r="42" fill="url(#heatGlowGrad)" opacity="0.08"/>
+
+                <!-- Vibration Shock Waves Radiating -->
+                <circle id="twinVibWaves" cx="310" cy="90" r="54" fill="none" stroke="#00f0ff" stroke-width="1.5" stroke-dasharray="4, 4" opacity="0.2"/>
+
+                <!-- Sensor Labels -->
+                <rect x="282" y="60" width="56" height="15" rx="3" fill="#080f1a" stroke="#00f0ff" stroke-width="1.2"/>
+                <text x="310" y="71" fill="#00f0ff" font-family="'JetBrains Mono'" font-size="7.5" font-weight="700" text-anchor="middle">MPU6050</text>
+
+                <rect x="282" y="112" width="56" height="15" rx="3" fill="#080f1a" stroke="#ff6b3d" stroke-width="1.2"/>
+                <text x="310" y="123" fill="#ff6b3d" font-family="'JetBrains Mono'" font-size="7.5" font-weight="700" text-anchor="middle">T: DHT11</text>
+              </g>
+
+              <!-- 5. SW-420 IMPACT SENSOR (Shaft Mid-Span) -->
+              <g id="twinShockSensor">
+                <circle id="twinShockIndicator" cx="230" cy="84" r="12" fill="none" stroke="#b794f6" stroke-width="2" opacity="0"/>
+                <rect x="212" y="52" width="42" height="15" rx="3" fill="#080f1a" stroke="#b794f6" stroke-width="1.2"/>
+                <text x="233" y="63" fill="#b794f6" font-family="'JetBrains Mono'" font-size="7" font-weight="700" text-anchor="middle">SW-420</text>
+              </g>
+
+              <!-- 6. TURBINE / IMPELLER CASING & BLADES (Right) -->
+              <g id="twinTurbine">
+                <!-- Casing Shell -->
+                <path d="M 412 35 C 490 35 530 65 530 90 C 530 115 490 145 412 145 Z" fill="#142138" stroke="#38bdf8" stroke-width="2"/>
+                <!-- Impeller Nozzle Outlet -->
+                <rect x="520" y="70" width="35" height="40" rx="3" fill="#1e293b" stroke="#38bdf8"/>
+                
+                <!-- Rotating Blades Assembly -->
+                <g id="twinRotorBlades" class="rotor-fan-blades">
+                  <circle cx="470" cy="90" r="10" fill="#cbd5e1"/>
+                  <line x1="470" y1="90" x2="470" y2="52" stroke="#00f0ff" stroke-width="4" stroke-linecap="round"/>
+                  <line x1="470" y1="90" x2="470" y2="128" stroke="#00f0ff" stroke-width="4" stroke-linecap="round"/>
+                  <line x1="470" y1="90" x2="432" y2="90" stroke="#00f0ff" stroke-width="4" stroke-linecap="round"/>
+                  <line x1="470" y1="90" x2="508" y2="90" stroke="#00f0ff" stroke-width="4" stroke-linecap="round"/>
+                  <line x1="470" y1="90" x2="443" y2="63" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="470" y1="90" x2="497" y2="117" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="470" y1="90" x2="443" y2="117" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="470" y1="90" x2="497" y2="63" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                </g>
+                <text x="470" y="162" fill="#94a3b8" font-family="'Rajdhani'" font-size="11" font-weight="700" text-anchor="middle">IMPELLER STAGE</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Visualizer Live Telemetry Overlay -->
+        <div class="twin-telemetry-strip">
+          <div class="twin-badge-stat">
+            <span class="twin-stat-label">Rotor Frequency</span>
+            <span class="twin-stat-val" id="twinValFreq" style="color: var(--c-vib);">49.2 Hz</span>
+          </div>
+          <div class="twin-badge-stat">
+            <span class="twin-stat-label">Bearing Temp</span>
+            <span class="twin-stat-val" id="twinValTemp" style="color: var(--c-temp);">32.5 °C</span>
+          </div>
+          <div class="twin-badge-stat">
+            <span class="twin-stat-label">Vibration RMS</span>
+            <span class="twin-stat-val" id="twinValVib" style="color: var(--c-vib);">0.120 g</span>
+          </div>
+          <div class="twin-badge-stat">
+            <span class="twin-stat-label">Motor Load</span>
+            <span class="twin-stat-val" id="twinValCur" style="color: var(--c-cur);">0.82 A</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Interactive Fault Injection & ABAD Demo Testing Suite -->
+      <div class="card-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            ABAD Anomaly Injection Testing Suite
+          </div>
+          <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #fde68a;">PHYSICAL SCENARIOS</span>
+        </div>
+
+        <div class="abad-controls-container">
+          <p style="font-size: 0.76rem; color: #94a3b8; line-height: 1.4;">
+            Simulate real physical failure modes directly on the live pipeline. The on-device ABAD engine detects shifts from its learned baseline and raises plain-English incident causes.
+          </p>
+
+          <div class="fault-btn-grid">
+            <!-- 1. Imbalance / Bearing Vibration -->
+            <button class="btn-fault" id="btnFaultImbalance" title="Tape coin to motor shaft (Hotkey: B)">
+              <div class="btn-fault-title">
+                <span class="hotkey-badge">B</span>
+                <span>Bearing Imbalance</span>
+              </div>
+              <div class="btn-fault-sub">RMS &gt; 7.1 mm/s, Peak &gt; 2g (Crit)</div>
+            </button>
+
+            <!-- 2. Thermal Rise -->
+            <button class="btn-fault" id="btnFaultThermal" title="Heat sensor with hair dryer (Hotkey: T)">
+              <div class="btn-fault-title">
+                <span class="hotkey-badge">T</span>
+                <span>Thermal Overheat</span>
+              </div>
+              <div class="btn-fault-sub">Temp rises &gt; 85 °C (Crit)</div>
+            </button>
+
+            <!-- 3. Motor Overload / Jam -->
+            <button class="btn-fault" id="btnFaultJam" title="Slow fan with card / finger (Hotkey: J)">
+              <div class="btn-fault-title">
+                <span class="hotkey-badge">J</span>
+                <span>Rotor Jam / Sag</span>
+              </div>
+              <div class="btn-fault-sub">Current &gt; 110%, Bus &lt; 90% (Crit)</div>
+            </button>
+
+            <!-- 4. Mechanical Shock Burst -->
+            <button class="btn-fault" id="btnFaultShock" title="Tap mounting board (Hotkey: S)">
+              <div class="btn-fault-title">
+                <span class="hotkey-badge">S</span>
+                <span>Impact Shock Burst</span>
+              </div>
+              <div class="btn-fault-sub">Shock rate &gt; 15 ev/min (Crit)</div>
+            </button>
+
+            <!-- 5. Sensor Health Mismatch -->
+            <button class="btn-fault" id="btnFaultMismatch" title="Diverge INA219 and ACS712 readings">
+              <div class="btn-fault-title">
+                <span class="hotkey-badge">M</span>
+                <span>Sensor Mismatch</span>
+              </div>
+              <div class="btn-fault-sub">INA219 vs ACS712 &gt; 25% delta</div>
+            </button>
+
+            <!-- 6. Reset to Normal -->
+            <button class="btn-fault" id="btnResetFaults" title="Return machine to normal operation (Hotkey: R)" style="border-color: var(--st-normal);">
+              <div class="btn-fault-title" style="color: var(--st-normal);">
+                <span class="hotkey-badge" style="color: var(--st-normal); border-color: var(--st-normal);">R</span>
+                <span>Restore Normal</span>
+              </div>
+              <div class="btn-fault-sub">Normal: 30-65°C, 0.28mm/s, 0-1g</div>
+            </button>
+          </div>
+
+          <div style="background: rgba(8, 15, 26, 0.6); padding: 0.65rem 0.85rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.72rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+            <span>Keyboard shortcuts: <strong style="color:#ffffff;">[B]</strong> [T] [J] [S] [L] [R]</span>
+            <span style="font-family: var(--font-mono); color: var(--st-normal);">Hysteresis: 5 Cycles</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ====================================================================
+         PANEL 3: TOP 8 LIVE TELEMETRY CARDS (Fixed Colors per Spec)
+         ==================================================================== -->
+    <section class="telemetry-cards-grid">
+      
+      <!-- 1. Vibration RMS Velocity (Normal: ~0.28 mm/s, Critical: > 7.1 mm/s) -->
+      <div class="telemetry-card" style="--card-accent: var(--c-vib);">
+        <div class="card-top">
+          <div class="card-title-group">
+            <span class="card-title">Vib RMS Velocity</span>
+            <span class="card-subtext">MPU6050 (ISO 10816)</span>
+          </div>
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-value-display">
+          <span class="telemetry-val" id="valVibVel">0.280</span>
+          <span class="telemetry-unit">mm/s</span>
+        </div>
+        <div class="card-footer-metric">
+          <span id="lblVibPeak">Peak: 0.35 g</span>
+          <span style="color: var(--st-normal);">Norm: 0.28 • Crit: &gt; 7.1</span>
+        </div>
+        <div class="metric-bar-container">
+          <div class="metric-bar-fill" id="barVibVel" style="width: 14%;"></div>
+        </div>
+      </div>
+
+      <!-- 2. Vibration Peak Acceleration (Normal: 0 - 1.0 g, Critical: > 2.0 g) -->
+      <div class="telemetry-card" style="--card-accent: var(--c-volt);">
+        <div class="card-top">
+          <div class="card-title-group">
+            <span class="card-title">Peak Accel</span>
+            <span class="card-subtext">MPU6050 Dynamic Peak</span>
+          </div>
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-value-display">
+          <span class="telemetry-val" id="valPeakAccel">0.350</span>
+          <span class="telemetry-unit">g</span>
+        </div>
+        <div class="card-footer-metric">
+          <span>Target: &lt; 1.0 g</span>
+          <span style="color: var(--st-normal);">Norm: 0-1g • Crit: &gt; 2g</span>
+        </div>
+        <div class="metric-bar-container">
+          <div class="metric-bar-fill" id="barPeakAccel" style="width: 17%; background: var(--c-volt);"></div>
+        </div>
+      </div>
+
+      <!-- 3. Bearing Temperature (Normal: 30 - 65 °C, Critical: > 85 °C) -->
+      <div class="telemetry-card" style="--card-accent: var(--c-temp);">
+        <div class="card-top">
+          <div class="card-title-group">
+            <span class="card-title">Bearing Temp</span>
+            <span class="card-subtext" id="lblTempSrc">DHT11 / DS18B20 Housing</span>
+          </div>
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-value-display">
+          <span class="telemetry-val" id="valTemp">42.5</span>
+          <span class="telemetry-unit">°C</span>
+        </div>
+        <div class="card-footer-metric">
+          <span>Norm: 30 - 65 °C</span>
+          <span style="color: #ff6b3d;">Crit: &gt; 85 °C</span>
+        </div>
+        <div class="metric-bar-container">
+          <div class="metric-bar-fill" id="barTemp" style="width: 35%; background: var(--c-temp);"></div>
+        </div>
+      </div>
+
+      <!-- 4. Ambient Humidity (Normal: 20 - 70 %RH, Critical: > 70 %RH) -->
+      <div class="telemetry-card" style="--card-accent: var(--c-hum);">
+        <div class="card-top">
+          <div class="card-title-group">
+            <span class="card-title">Humidity</span>
+            <span class="card-subtext">DHT11 Ambient Air</span>
+          </div>
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-value-display">
+          <span class="telemetry-val" id="valHumidity">52.0</span>
+          <span class="telemetry-unit">%RH</span>
+        </div>
+        <div class="card-footer-metric">
+          <span>Norm: 20 - 70 %RH</span>
+          <span style="color: var(--st-normal);">Crit: &gt; 70%</span>
+        </div>
+        <div class="metric-bar-container">
+          <div class="metric-bar-fill" id="barHumidity" style="width: 52%; background: var(--c-hum);"></div>
+        </div>
+      </div>
+
+      <!-- 5. Load Current INA219 (Normal: 0 - 100% [2.0A], Critical: > 110% [> 2.2A]) -->
+      <div class="telemetry-card" style="--card-accent: var(--c-cur);">
+        <div class="card-top">
+          <div class="card-title-group">
+            <span class="card-title">Load Current</span>
+            <span class="card-subtext">INA219 (2.0A Rated Base)</span>
+          </div>
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 14 14"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-value-display">
+          <span class="telemetry-val" id="valCurrentIna">0.850</span>
+          <span class="telemetry-unit">A</span>
+        </div>
+        <div class="card-footer-metric">
+          <span id="lblCurrentAcs">42.5% rated • ACS712: 0.84A</span>
+          <span style="color: var(--st-normal);">Crit: &gt; 110%</span>
+        </div>
+        <div class="metric-bar-container">
+          <div class="metric-bar-fill" id="barCurrentIna" style="width: 42%; background: var(--c-cur);"></div>
+        </div>
+      </div>
+
+      <!-- 6. DC Bus Voltage (Normal: 95 - 100% [5.0V], Critical: < 90% [< 4.5V]) -->
+      <div class="telemetry-card" style="--card-accent: var(--c-volt);">
+        <div class="card-top">
+          <div class="card-title-group">
+            <span class="card-title">DC Bus Voltage</span>
+            <span class="card-subtext">INA219 Supply Rail</span>
+          </div>
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-value-display">
+          <span class="telemetry-val" id="valVoltage">4.98</span>
+          <span class="telemetry-unit">V</span>
+        </div>
+        <div class="card-footer-metric">
+          <span>Norm: 95 - 100% (5V)</span>
+          <span style="color: var(--st-normal);">Crit: &lt; 90% (&lt; 4.5V)</span>
+        </div>
+        <div class="metric-bar-container">
+          <div class="metric-bar-fill" id="barVoltage" style="width: 99%; background: var(--c-volt);"></div>
+        </div>
+      </div>
+
+      <!-- 7. Shock Rate (Normal: 0 - 5 events/min, Critical: > 15 events/min) -->
+      <div class="telemetry-card" style="--card-accent: var(--c-shock);">
+        <div class="card-top">
+          <div class="card-title-group">
+            <span class="card-title">Shock Rate</span>
+            <span class="card-subtext">SW-420 (GPIO 27)</span>
+          </div>
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-value-display">
+          <span class="telemetry-val" id="valShockRate">0.0</span>
+          <span class="telemetry-unit">ev/min</span>
+        </div>
+        <div class="card-footer-metric">
+          <span>Norm: 0 - 5 ev/min</span>
+          <span style="color: var(--st-normal);">Crit: &gt; 15/min</span>
+        </div>
+        <div class="metric-bar-container">
+          <div class="metric-bar-fill" id="barShockRate" style="width: 0%; background: var(--c-shock);"></div>
+        </div>
+      </div>
+
+      <!-- 8. Active Power & Dominant Frequency -->
+      <div class="telemetry-card" style="--card-accent: var(--c-power);">
+        <div class="card-top">
+          <div class="card-title-group">
+            <span class="card-title">Power &amp; Freq</span>
+            <span class="card-subtext">V × I Active Load</span>
+          </div>
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>
+            </svg>
+          </div>
+        </div>
+        <div class="card-value-display">
+          <span class="telemetry-val" id="valPower">4.23</span>
+          <span class="telemetry-unit">W</span>
+        </div>
+        <div class="card-footer-metric">
+          <span id="lblPowerFreq">49.2 Hz (~2952 RPM)</span>
+          <span style="color: var(--c-power);">Nominal</span>
+        </div>
+        <div class="metric-bar-container">
+          <div class="metric-bar-fill" id="barPower" style="width: 42%; background: var(--c-power);"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ====================================================================
+         PANEL 4: 6 REAL-TIME WAVEFORM CHARTS
+         ==================================================================== -->
+    <div class="card-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+            <line x1="2" y1="20" x2="22" y2="20"/>
+          </svg>
+          Process Parameter Telemetry Waveforms (30s Rolling Window)
+        </div>
+        <div class="time-range-group">
+          <button class="time-btn active">LIVE STREAM (2 Hz)</button>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        
+        <!-- Chart 1: Temperature -->
+        <div class="chart-card" style="--chart-accent: var(--c-temp);">
+          <div class="chart-card-header">
+            <div class="chart-title-group">
+              <span class="status-indicator-dot" style="background: var(--c-temp);"></span>
+              <span class="chart-title">Bearing Temperature vs Time (°C)</span>
+            </div>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chartTemp"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: Vibration & Shock -->
+        <div class="chart-card" style="--chart-accent: var(--c-vib);">
+          <div class="chart-card-header">
+            <div class="chart-title-group">
+              <span class="status-indicator-dot" style="background: var(--c-vib);"></span>
+              <span class="chart-title">Vibration RMS, Peak & Shock Rate vs Time</span>
+            </div>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chartVib"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 3: Current INA219 vs ACS712 -->
+        <div class="chart-card" style="--chart-accent: var(--c-cur);">
+          <div class="chart-card-header">
+            <div class="chart-title-group">
+              <span class="status-indicator-dot" style="background: var(--c-cur);"></span>
+              <span class="chart-title">Load Current vs Time: INA219 &amp; ACS712 (A)</span>
+            </div>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chartCurrent"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 4: Voltage & Power -->
+        <div class="chart-card" style="--chart-accent: var(--c-volt);">
+          <div class="chart-card-header">
+            <div class="chart-title-group">
+              <span class="status-indicator-dot" style="background: var(--c-volt);"></span>
+              <span class="chart-title">Bus Voltage (V) &amp; Power Draw (W) vs Time</span>
+            </div>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chartVoltage"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 5: Ambient Humidity -->
+        <div class="chart-card" style="--chart-accent: var(--c-hum);">
+          <div class="chart-card-header">
+            <div class="chart-title-group">
+              <span class="status-indicator-dot" style="background: var(--c-hum);"></span>
+              <span class="chart-title">Ambient Humidity vs Time (%RH)</span>
+            </div>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chartHumidity"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 6: Anomaly Score & Z-Scores -->
+        <div class="chart-card" style="--chart-accent: var(--c-score);">
+          <div class="chart-card-header">
+            <div class="chart-title-group">
+              <span class="status-indicator-dot" style="background: var(--c-score);"></span>
+              <span class="chart-title">Fused Anomaly Score (S) &amp; Thresholds</span>
+            </div>
+          </div>
+          <div class="chart-canvas-wrapper">
+            <canvas id="chartScore"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         PANEL 5: ANOMALY INTELLIGENCE & 5 Z-SCORE CHANNELS
+         ==================================================================== -->
+    <div class="card-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          ABAD Feature Intelligence &amp; Normalized Z-Scores: z_i = (e_i - μ_i) / σ_i
+        </div>
+        <span style="font-family: var(--font-mono); font-size: 0.72rem; color: #94a3b8;">
+          Diagonal Mahalanobis Distance Metrics
+        </span>
+      </div>
+
+      <div class="zscore-bars-container">
+        <!-- 1. z_vib -->
+        <div class="zscore-item-card" style="border-left: 3px solid var(--c-vib);">
+          <div class="zscore-item-header">
+            <span>z_vib (Weight: 1.5)</span>
+            <span id="zValVib">0.20</span>
+          </div>
+          <div class="zscore-track">
+            <div class="zscore-fill" id="zBarVib" style="width: 5%; background: var(--c-vib);"></div>
+          </div>
+          <span style="font-size: 0.65rem; color: #64748b;">σ floor: 0.01g</span>
+        </div>
+
+        <!-- 2. z_cur -->
+        <div class="zscore-item-card" style="border-left: 3px solid var(--c-cur);">
+          <div class="zscore-item-header">
+            <span>z_cur (Weight: 1.5)</span>
+            <span id="zValCur">0.10</span>
+          </div>
+          <div class="zscore-track">
+            <div class="zscore-fill" id="zBarCur" style="width: 3%; background: var(--c-cur);"></div>
+          </div>
+          <span style="font-size: 0.65rem; color: #64748b;">σ floor: 0.05A</span>
+        </div>
+
+        <!-- 3. z_temp -->
+        <div class="zscore-item-card" style="border-left: 3px solid var(--c-temp);">
+          <div class="zscore-item-header">
+            <span>z_temp (Weight: 1.0)</span>
+            <span id="zValTemp">0.10</span>
+          </div>
+          <div class="zscore-track">
+            <div class="zscore-fill" id="zBarTemp" style="width: 3%; background: var(--c-temp);"></div>
+          </div>
+          <span style="font-size: 0.65rem; color: #64748b;">σ floor: 0.3°C</span>
+        </div>
+
+        <!-- 4. z_volt -->
+        <div class="zscore-item-card" style="border-left: 3px solid var(--c-volt);">
+          <div class="zscore-item-header">
+            <span>z_volt (Weight: 1.0)</span>
+            <span id="zValVolt">0.05</span>
+          </div>
+          <div class="zscore-track">
+            <div class="zscore-fill" id="zBarVolt" style="width: 2%; background: var(--c-volt);"></div>
+          </div>
+          <span style="font-size: 0.65rem; color: #64748b;">σ floor: 0.05V</span>
+        </div>
+
+        <!-- 5. z_shock -->
+        <div class="zscore-item-card" style="border-left: 3px solid var(--c-shock);">
+          <div class="zscore-item-header">
+            <span>z_shock (Weight: 1.0)</span>
+            <span id="zValShock">0.00</span>
+          </div>
+          <div class="zscore-track">
+            <div class="zscore-fill" id="zBarShock" style="width: 0%; background: var(--c-shock);"></div>
+          </div>
+          <span style="font-size: 0.65rem; color: #64748b;">σ floor: 0.5 ev/s</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         PANEL 6: INCIDENT REGISTER TABLE (Newest First)
+         ==================================================================== -->
+    <div class="card-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          Industrial Incident Register &amp; Attribution Audit Log
+        </div>
+        <div>
+          <button class="btn-cyber" id="btnClearIncidents" style="font-size: 0.72rem; padding: 0.25rem 0.65rem;">
+            Clear Log
+          </button>
+        </div>
+      </div>
+
+      <div class="incidents-table-wrapper">
+        <table class="incidents-table" id="incidentTable">
+          <thead>
+            <tr>
+              <th style="width: 110px;">Timestamp</th>
+              <th style="width: 120px;">Severity</th>
+              <th style="width: 140px;">Parameter</th>
+              <th>Plain-English Cause</th>
+              <th>Recommended Industrial Action</th>
+              <th style="width: 90px;">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Dynamically populated by app.js -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div> <!-- End .dashboard-container -->
+
+  <!-- ====================================================================
+       SETTINGS MODAL (ESP32 Gateway / Server Link)
+       ==================================================================== -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-window">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          IPPAD Telemetry Source Configuration
+        </div>
+        <button class="btn-cyber" id="btnCloseSettingsModal" style="border: none; background: transparent;">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p style="font-size: 0.78rem; color: #94a3b8;">
+          Switch between the high-fidelity on-device ABAD simulation engine or poll a physical ESP32 running on your LAN or localhost server.
+        </p>
+
+        <div class="form-group">
+          <label for="cfgConnectionMode">Telemetry Feed Mode</label>
+          <select id="cfgConnectionMode" class="form-control">
+            <option value="demo" selected>🎮 Demo Simulation Mode (Presentation &amp; Interactive Scenarios)</option>
+            <option value="real">⚡ Real-Time Hardware Mode (Live ESP32 / Server REST API)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="cfgServerIp">Server or ESP32 Address</label>
+          <input type="text" id="cfgServerIp" class="form-control" value="http://localhost:8000" placeholder="e.g. http://localhost:8000 or http://192.168.1.150:8000">
+        </div>
+
+        <div style="background: rgba(8, 15, 26, 0.6); padding: 0.65rem 0.85rem; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.72rem; color: #94a3b8;">
+          <div style="font-weight: 700; color: var(--c-vib); margin-bottom: 4px;">Launch Modes &amp; URL Info:</div>
+          <div style="color: #cbd5e1; line-height: 1.4;">
+            • <strong>http://localhost:8000</strong>: Run <code>python server.py</code> in terminal to host dashboard and ingest real ESP32 POST packets.<br>
+            • <strong>file:///.../index.html</strong>: Double-click <code>index.html</code> from Windows Explorer for instant offline browser launch without command prompt.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cyber primary" id="btnSaveSettings">Save &amp; Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dashboard JavaScript Modules (No Supabase, No External Auth Wall) -->
+  <script src="js/data-service.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/turbomachine-visualizer.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
